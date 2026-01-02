@@ -8,5 +8,8 @@
 			"path": "SF-Flower"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"editor.insertSpaces": false,
+		"editor.detectIndentation": false
+	}
 }
