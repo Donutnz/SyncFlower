@@ -15,4 +15,13 @@
 #define BATT_R2 3192 //ohms
 
 // Servos scan field
-#define MAX_SCAN_FIELD 180 //degrees
+#define SCAN_X_MAX 180 //degrees
+#define SCAN_X_MIN 0 //degrees
+#define SCAN_Z_MAX 180 //degrees
+#define SCAN_Z_MIN 0 //degrees
+
+// Divisior for scan field. Larger number = courser scan
+#define SCAN_X_GRADS_DIV 4
+#define SCAN_Z_GRADS_DIV 4
+
+#define SERVO_SPEED 60 //100?
