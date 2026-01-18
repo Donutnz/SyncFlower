@@ -7,7 +7,6 @@
 /**
  * Battery Level Read
  * 
- * ADC Max: 1.1V
  * Batt range: 4.2 - 3.0V
  */
 
@@ -21,7 +20,9 @@
 #define SCAN_Z_MIN 0 //degrees
 
 // Divisior for scan field. Larger number = courser scan
-#define SCAN_X_GRADS_DIV 4
-#define SCAN_Z_GRADS_DIV 4
+#define SCAN_X_SAMPLES 4
+#define SCAN_Z_SAMPLES 4
 
 #define SERVO_SPEED 60 //100?
+
+#define SCAN_DELAY 30000 //milliseconds. Time between scans
