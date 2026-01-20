@@ -25,14 +25,28 @@ Adafruit_NeoPixel neoStrip(NEO_COUNT, NEO_PIN); // May need other arg
 
 int headX = 90;
 int headZ = 90;
-float headLux = 0;
+int headLux = 0;
+
+bool petalsClosed = false;
+
+// Time batt disp started
+unsigned long battDispMillis = 0;
+
+// Time petals motor started
+unsigned long petalsMoveStart = 0;
 
 //Make petals hit the limit switch
 void homePetals();
 
 void openPetals();
 
-void angleHead(int x, int z);
+void updateHead();
+
+void updateNeo();
+
+void updatePetals();
+
+void setNeoToSun();
 
 void readBattery();
 
@@ -92,8 +106,20 @@ void loop(){
 	}
 	hmqClient.loop();
 
-	if(digitalRead(SW_UI)){
+	unsigned long currentMillis = millis();
 
+	if(digitalRead(SW_UI) && (currentMillis - battDispMillis > 10)){ // Debounce as well
+		battDispMillis = currentMillis;
+
+		readBattery();
+	}
+
+	if((currentMillis - battDispMillis >= BATT_DISP_DURATION) && battDispMillis > 0){ // Reset display to normal
+		setNeoToSun();
+	}
+
+	if(currentMillis - petalsMoveStart > PETALS_TRAVEL_DURATION){ // Stop petals when open
+		winchServo.easeTo(0); // Blocking. May cause issues?
 	}
 }
 
@@ -117,22 +143,49 @@ void homePetals(){
 }
 
 void readBattery(){
-	int battAvg = (analogRead(BATT_ADC_A) + analogRead(BATT_ADC_B)) / 2; // 0-4096, 1.786-2.5
+	int battAvg = (analogRead(BATT_ADC_A) + analogRead(BATT_ADC_B)) / 2; // 0-4095, 1.786-2.5
 
 	Serial.print("Batt ADC: ");
 	Serial.println(battAvg);
 
-	for(int i = 0; i < NEO_COUNT; i++){
+	int neoMapped = floor((battAvg - BATT_MIN) / (BATT_MAX - BATT_MIN) * (NEO_COUNT - 1) + 1);
 
+	Serial.print("Neomapped: ");
+	Serial.println(neoMapped);
+
+	neoStrip.clear(); // Clear strip
+
+	for(int i = 0; i < neoMapped; i++){
+		//neoStrip.setPixelColor(i, 255, 0, 0);
+		neoStrip.setPixelColor(i, neoStrip.gamma32(neoStrip.ColorHSV(map(i, 0, 15, 0, 65536/3)))); // Map 0-15 to HSV red-green range
+	}
+
+	neoStrip.show();
+}
+
+void setNeoToSun(){
+	neoStrip.fill(neoStrip.gamma32(COLOUR_SUN), 0, NEO_COUNT);
+	neoStrip.show();
+}
+
+void updateHead(){
+	xServo.setEaseTo(headX);
+	zServo.setEaseTo(headZ);
+
+	while(isOneServoMoving){
+		hmqClient.loop(); // Maintain MQTT connection
+
+		updateAllServos();
 	}
 }
 
-int msgToInt(byte* msgBody, unsigned int msgLength){ //Delete. error.
-	int retVal=0;
-	for(int i=0; i< msgLength; i++){
-		retVal += ((char)msgBody[i] - '0');
+void updatePetals(){
+	if(headLux >= PETAL_THRESHOLD){
+		winchServo.setEaseTo(WINCH_DEPLOY_RATE);
 	}
-	return retVal;
+	else if(headLux < PETAL_THRESHOLD && ){
+		winchServo.setEaseTo(WINCH_RETRACT_RATE);
+	}
 }
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -157,7 +210,7 @@ void callback(char* topic, byte* message, unsigned int length) {
 		headLux = atoi((char*)message);
 	}
 	else if(String(topic) == "tracker/EOF"){
-		//Move head
+		
 		hmqClient.publish("flower/ACK", "1");
 	}
 }
@@ -179,7 +232,7 @@ void setup_wifi(){
 	}
 
 	Serial.println("");
-	Serial.println("WiFi connected");
+	Serial.println("WiFi conneced");
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
 }

@@ -18,9 +18,16 @@
 
 #define NEO_COUNT 16
 
-#define BATT_MAX 2.5
-#define BATT_MIN 1.786
+// Battery level min and max
+// Y = (X - A) / (B - A) * (D - C) + C
+#define BATT_MAX 2216 // 3.0V
+#define BATT_MIN 3103 // 4.2V
 
+#define BATT_DISP_DURATION 10000 //milliseconds to show voltage readout
+
+#define PETAL_THRESHOLD 1000 //lux. Below this the petals close
+
+#define PETALS_TRAVEL_DURATION 3000 //ms time for petals to go change
 
 // Colours
-#define COLOUR_SUN 255204000
+#define COLOUR_SUN 255204000 //Might change to HSV hue
