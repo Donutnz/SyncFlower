@@ -2,8 +2,10 @@
  * Network creds
  */
 
-#define wifi_SSID ""
-#define wifi_Pass ""
+const char* wifi_SSID = "Ti Kouka - 2.4GHz";
+const char* wifi_Pass = "TrixiePoppy";
 
-#define hiveMQ_UName ""
-#define hiveMQ_Pass ""
+const char* hiveMQ_Addr = "571950dde3e941329c5b3feec9b03fbc.s1.eu.hivemq.cloud";
+#define HIVEMQ_PORT 8883
+const char* hiveMQ_UName = "SF_Tracker";
+const char* hiveMQ_Pass = "Syncflower1";

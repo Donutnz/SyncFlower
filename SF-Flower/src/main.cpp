@@ -3,6 +3,7 @@
 
 #include "pins.h"
 #include "config.h"
+#include "creds.h"
 
 ServoEasing xServo;
 ServoEasing zServo;
@@ -11,6 +12,16 @@ ServoEasing winchServo;
 // Current position of petals and thus winch
 int winchPosition = 0;
 
+WiFiClientSecure netClient;
+PubSubClient hmqClient(netClient);
+
+//Char buffer for MQTT pub
+char msgBuffer[12];
+
+int headX = 90;
+int headY = 90;
+float headLux = 0;
+
 //Make petals hit the limit switch
 void homePetals();
 
@@ -18,20 +29,54 @@ void openPetals();
 
 void angleHead(int x, int z);
 
+// Wifi setup stuff
+void setup_wifi();
+
+// MQTT Connect
+void reconnect();
+
+void callback(char* topic, byte* message, unsigned int length);
+
 void setup(){
+	Serial.begin(115200);
+
+	#ifdef APP_DEBUG //Delay if debugging for serial port to warm up
+	delay(5000);
+	#endif
+
 	zServo.attach(MOT_AX0, 90);
 	xServo.attach(MOT_AX1, 90);
 
 	winchServo.attach(MOT_AX1, 0);
 
+	setEasingTypeForAllServos(EASE_QUADRATIC_IN_OUT);
+
 	pinMode(ONBOARD_LED, OUTPUT);
 	pinMode(SW_LIMIT, INPUT);
 	pinMode(SW_UI, INPUT);
 
+	// Init WiFi
+	setup_wifi();
+
+	// Init HiveMQ MQTT
+	hmqClient.setServer(hiveMQ_Addr, HIVEMQ_PORT);
+	hmqClient.setClient(netClient);
+	hmqClient.setCallback(callback);
+
+	// Wait for servos to get to their start positions
+	synchronizeAllServosStartAndWaitForAllServosToStop();
+	
+	// Set servo operation to be non-blocking
+	synchronizeAllServosAndStartInterrupt(false);
+	
+	Serial.println("Set up done, running...");
 }
 
 void loop(){
-
+	if(!hmqClient.connected()){
+		reconnect();
+	}
+	hmqClient.loop();
 }
 
 void homePetals(){
@@ -51,4 +96,90 @@ void homePetals(){
 	}
 
 	winchServo.write(0); //Stop winch
+}
+
+int msgToInt(byte* msgBody, unsigned int msgLength){ //Delete. error.
+	int retVal=0;
+	for(int i=0; i< msgLength; i++){
+		retVal += ((char)msgBody[i] - '0');
+	}
+	return retVal;
+}
+
+void callback(char* topic, byte* message, unsigned int length) {
+	Serial.print("Message arrived on topic: ");
+	Serial.print(topic);
+	Serial.print(". Message: ");
+	String messageTemp;
+
+	for (int i = 0; i < length; i++) {
+		Serial.print((char)message[i]);
+		messageTemp += (char)message[i];
+	}
+	Serial.println();
+
+	if(String(topic) == "tracker/X"){
+		headX = atoi(message);
+	}
+	else if(String(topic) == "tracker/Z"){
+		headZ = atoi(message);
+	}
+	else if(String(topic) == "tracker/lux"){
+		headLux = atoi(message);
+	}
+	else if(String(topic) == "tracker/EOF"){
+		//Move head
+		hmqClient.publish("flower/ACK", "1");
+	}
+}
+
+void setup_wifi(){
+	netClient.setInsecure();
+
+	delay(10);
+	// We start by connecting to a WiFi network
+	Serial.println();
+	Serial.print("Connecting to ");
+	Serial.println(wifi_SSID);
+
+	WiFi.begin(wifi_SSID, wifi_Pass);
+
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+	}
+
+	Serial.println("");
+	Serial.println("WiFi connected");
+	Serial.println("IP address: ");
+	Serial.println(WiFi.localIP());
+}
+
+void reconnect() {
+	// Loop until we're reconnected
+	while (!hmqClient.connected()) {
+		Serial.print("Attempting MQTT connection...");
+
+		// Attempt to connect
+		if (hmqClient.connect(
+			"SF_Flower",
+			hiveMQ_UName,
+			hiveMQ_Pass,
+			"flower/dconn",
+			2,
+			true,
+			"0"
+		)) {
+			Serial.println("MQTT Connected");
+			// Subscribe
+			hmqClient.subscribe("tracker/#");
+			hmqClient.publish("flower/conn", "1"); // connection message
+		} else {
+			Serial.print("failed, rc=");
+			Serial.print(hmqClient.state());
+			Serial.println(" try again in 5 seconds");
+			// Wait 5 seconds before retrying
+			delay(5000);
+		}
+	}
 }

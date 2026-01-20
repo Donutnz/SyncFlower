@@ -4,21 +4,17 @@
  * Pin definitions
  */
 
+#define I2C_SDA 9
+#define I2C_SCL 10
+
 #define SERVO_X 6
 #define SERVO_Z 7
 
 // Battery ADC pin
-#define BATT_ADC_A 0
-#define BATT_ADC_B 1
+#define BATT_ADC 10
 
 #define ONBOARD_LED 8
 
-#define SW_LIMIT 3
-#define SW_UI 4
- 
-#define MOT_AX0 5
-#define MOT_AX1 6
-
-#define MOT_PETAL 7
-
-#define NEO_RING 10
+#define STATUS_B 1
+#define STATUS_G 3
+#define STATUS_R 4
