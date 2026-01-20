@@ -18,4 +18,4 @@
 
 #define MOT_PETAL 7
 
-#define NEO_RING 10
+#define NEO_PIN 10

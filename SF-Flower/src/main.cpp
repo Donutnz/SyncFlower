@@ -1,5 +1,8 @@
 #include <Arduino.h>
 #include <ServoEasing.hpp>
+#include <PubSubClient.h>
+#include <WiFiClientSecure.h>
+#include <Adafruit_NeoPixel.h>
 
 #include "pins.h"
 #include "config.h"
@@ -18,8 +21,10 @@ PubSubClient hmqClient(netClient);
 //Char buffer for MQTT pub
 char msgBuffer[12];
 
+Adafruit_NeoPixel neoStrip(NEO_COUNT, NEO_PIN); // May need other arg
+
 int headX = 90;
-int headY = 90;
+int headZ = 90;
 float headLux = 0;
 
 //Make petals hit the limit switch
@@ -28,6 +33,8 @@ void homePetals();
 void openPetals();
 
 void angleHead(int x, int z);
+
+void readBattery();
 
 // Wifi setup stuff
 void setup_wifi();
@@ -44,6 +51,13 @@ void setup(){
 	delay(5000);
 	#endif
 
+	pinMode(ONBOARD_LED, OUTPUT);
+	pinMode(SW_LIMIT, INPUT);
+	pinMode(SW_UI, INPUT);
+
+	pinMode(BATT_ADC_A, INPUT);
+	pinMode(BATT_ADC_B, INPUT);
+
 	zServo.attach(MOT_AX0, 90);
 	xServo.attach(MOT_AX1, 90);
 
@@ -51,9 +65,9 @@ void setup(){
 
 	setEasingTypeForAllServos(EASE_QUADRATIC_IN_OUT);
 
-	pinMode(ONBOARD_LED, OUTPUT);
-	pinMode(SW_LIMIT, INPUT);
-	pinMode(SW_UI, INPUT);
+	// Init Neopixel ring
+	neoStrip.begin();
+	neoStrip.show();
 
 	// Init WiFi
 	setup_wifi();
@@ -77,6 +91,10 @@ void loop(){
 		reconnect();
 	}
 	hmqClient.loop();
+
+	if(digitalRead(SW_UI)){
+
+	}
 }
 
 void homePetals(){
@@ -96,6 +114,17 @@ void homePetals(){
 	}
 
 	winchServo.write(0); //Stop winch
+}
+
+void readBattery(){
+	int battAvg = (analogRead(BATT_ADC_A) + analogRead(BATT_ADC_B)) / 2; // 0-4096, 1.786-2.5
+
+	Serial.print("Batt ADC: ");
+	Serial.println(battAvg);
+
+	for(int i = 0; i < NEO_COUNT; i++){
+
+	}
 }
 
 int msgToInt(byte* msgBody, unsigned int msgLength){ //Delete. error.
@@ -119,13 +148,13 @@ void callback(char* topic, byte* message, unsigned int length) {
 	Serial.println();
 
 	if(String(topic) == "tracker/X"){
-		headX = atoi(message);
+		headX = atoi((char*)message);
 	}
 	else if(String(topic) == "tracker/Z"){
-		headZ = atoi(message);
+		headZ = atoi((char*)message);
 	}
 	else if(String(topic) == "tracker/lux"){
-		headLux = atoi(message);
+		headLux = atoi((char*)message);
 	}
 	else if(String(topic) == "tracker/EOF"){
 		//Move head

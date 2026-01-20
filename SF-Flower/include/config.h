@@ -15,3 +15,12 @@
 #define HEAD_MAX_X 90
 
 #define WINCH_DIAMETER 24 //mm. Diameter of winch drum
+
+#define NEO_COUNT 16
+
+#define BATT_MAX 2.5
+#define BATT_MIN 1.786
+
+
+// Colours
+#define COLOUR_SUN 255204000
