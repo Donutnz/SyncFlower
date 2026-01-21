@@ -30,5 +30,9 @@
 
 #define PETALS_TRAVEL_DURATION 3000 //ms time for petals to go change
 
-// Colours
-#define COLOUR_SUN 9830 //Might change to HSV hue
+// Colours. HSV Hue Values
+#define COLOUR_SUN 9830
+#define COLOUR_NORMAL 21845
+#define COLOUR_MQTT 54613
+#define COLOUR_WIFI 32768
+#define COLOUR_STARTING 43690

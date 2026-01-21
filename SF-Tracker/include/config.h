@@ -27,7 +27,7 @@
 
 #define SERVO_SPEED 160 //100?
 
-#define SCAN_DELAY 20000 //milliseconds. Time between scans
+#define SCAN_DELAY 30000 //milliseconds. Time between scans
 
 //Status LED States
 #define STATUS_NORMAL 0
@@ -35,4 +35,5 @@
 #define STATUS_DISCONNECT 2
 #define STATUS_LOWBATT 3
 #define STATUS_SCANNING 4
-#define STATUS_ENDSCAN 5
+#define STATUS_CONNWIFI 5
+#define STATUS_CONNMQTT 6

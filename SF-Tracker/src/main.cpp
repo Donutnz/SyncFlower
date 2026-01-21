@@ -209,7 +209,7 @@ void scanForSun(){
 		}
 	}
 
-	setStatusLED(STATUS_ENDSCAN);
+	setStatusLED(STATUS_NORMAL);
 
 	//Home servos
 	xServo.setEaseTo(sunPosX);
@@ -241,16 +241,21 @@ void setStatusLED(int status){
 			break;
 		case STATUS_SCANNING:
 			digitalWrite(STATUS_B, HIGH);
-			digitalWrite(STATUS_R, HIGH);
-			break;
-		case STATUS_ENDSCAN:
 			digitalWrite(STATUS_G, HIGH);
+		break;
+		case STATUS_CONNMQTT:
 			digitalWrite(STATUS_R, HIGH);
+			digitalWrite(STATUS_B, HIGH);
 			break;
+		case STATUS_CONNWIFI:
+			digitalWrite(STATUS_R, HIGH);
+			digitalWrite(STATUS_G, HIGH);
 		}
 }
 
 void setup_wifi(){
+	setStatusLED(STATUS_CONNWIFI);
+
 	netClient.setInsecure();
 
 	delay(10);
@@ -270,6 +275,8 @@ void setup_wifi(){
 	Serial.println("WiFi connected");
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
+
+	setStatusLED(STATUS_NORMAL);
 }
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -320,6 +327,8 @@ void callback(char* topic, byte* message, unsigned int length) {
 
 void reconnect() {
 	// Loop until we're reconnected
+	setStatusLED(STATUS_CONNMQTT);
+
 	while (!hmqClient.connected()) {
 		Serial.print("Attempting MQTT connection...");
 
@@ -345,4 +354,6 @@ void reconnect() {
 			delay(5000);
 		}
 	}
+
+	setStatusLED(STATUS_NORMAL);
 }

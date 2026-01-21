@@ -50,6 +50,8 @@ void setNeoToSun(byte brightness);
 
 void readBattery();
 
+void setStatusRing(int statusColour);
+
 // Wifi setup stuff
 void setup_wifi();
 
@@ -69,6 +71,12 @@ void setup(){
 	pinMode(ONBOARD_LED, OUTPUT);
 	pinMode(SW_LIMIT, INPUT);
 	pinMode(SW_UI, INPUT);
+
+	// Init Neopixel ring
+	neoStrip.begin();
+	neoStrip.show();
+
+	setStatusRing(COLOUR_STARTING);
 
 	pinMode(BATT_ADC_A, INPUT);
 	pinMode(BATT_ADC_B, INPUT);
@@ -92,11 +100,9 @@ void setup(){
 	synchronizeAllServosAndStartInterrupt(false);
 
 	//homePetals();
-	Serial.print("THing: ");
+	Serial.print("Thing: ");
 	Serial.println(digitalRead(SW_LIMIT));
-	// Init Neopixel ring
-	neoStrip.begin();
-	neoStrip.show();
+	homePetals();
 
 	// Init WiFi
 	setup_wifi();
@@ -129,7 +135,7 @@ void loop(){
 	}
 
 	if(currentMillis - petalsStartMillis > PETALS_TRAVEL_DURATION){ // Stop petals when open
-		winchServo.easeTo(0); // Blocking. May cause issues?
+		winchServo.easeTo(90); // Blocking. May cause issues?
 	}
 }
 
@@ -141,7 +147,7 @@ void homePetals(){
 		return;
 	}
 
-	//winchServo.easeTo(WINCH_RETRACT_RATE);
+	winchServo.easeTo(90 + WINCH_RETRACT_RATE);
 
 	unsigned long startMillis = millis();
 
@@ -149,7 +155,7 @@ void homePetals(){
 		//hmqClient.loop();
 	}
 
-	winchServo.easeTo(0); // Stop pulling
+	winchServo.easeTo(90); // Stop pulling
 
 	Serial.println("Petals Homed");
 }
@@ -212,12 +218,12 @@ void updateHead(){
 	if(headLux >= PETAL_THRESHOLD){
 		brightLvl = 0.0f;
 		opening = true;
-		winchServo.easeTo(WINCH_DEPLOY_RATE);
+		winchServo.easeTo(90 + WINCH_DEPLOY_RATE);
 	}
 	else if(headLux < PETAL_THRESHOLD){
 		brightLvl = 255.0f;
 		opening = false;
-		winchServo.easeTo(WINCH_RETRACT_RATE);
+		winchServo.easeTo(90 + WINCH_RETRACT_RATE);
 	}
 
 	unsigned long startMillis = millis();
@@ -237,7 +243,15 @@ void updateHead(){
 		setNeoToSun(constrain((int)brightLvl, 0, 255));
 	}
 
-	winchServo.easeTo(0); //Stop moving
+	winchServo.easeTo(90); //Stop moving
+}
+
+void setStatusRing(int statusColour){
+	neoStrip.clear();
+
+	neoStrip.fill(neoStrip.gamma32(neoStrip.ColorHSV(statusColour))); // Map 0-15 to HSV red-green range
+
+	neoStrip.show();
 }
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -268,9 +282,14 @@ void callback(char* topic, byte* message, unsigned int length) {
 
 		hmqClient.publish("flower/ACK", "1");
 	}
+	else if(String(topic) == "tracker/dconn"){
+		setStatusRing(0);
+	}
 }
 
 void setup_wifi(){
+	setStatusRing(COLOUR_WIFI);
+
 	netClient.setInsecure();
 
 	delay(10);
@@ -290,9 +309,13 @@ void setup_wifi(){
 	Serial.println("WiFi conneced");
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
+
+	setStatusRing(COLOUR_NORMAL);
 }
 
 void reconnect() {
+	setStatusRing(COLOUR_MQTT);
+
 	// Loop until we're reconnected
 	while (!hmqClient.connected()) {
 		Serial.print("Attempting MQTT connection...");
@@ -319,4 +342,6 @@ void reconnect() {
 			delay(5000);
 		}
 	}
+
+	setStatusRing(COLOUR_NORMAL);
 }
