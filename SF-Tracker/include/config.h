@@ -16,18 +16,18 @@
 #define BATT_R2 3192 //ohms
 
 // Servos scan field
-#define SCAN_X_MAX 140 //degrees
+#define SCAN_X_MAX 130 //degrees
 #define SCAN_X_MIN 90 //degrees
-#define SCAN_Z_MAX 180 //degrees
-#define SCAN_Z_MIN 0 //degrees
+#define SCAN_Z_MAX 160 //degrees
+#define SCAN_Z_MIN 20 //degrees
 
 // Divisior for scan field. Larger number = courser scan
-#define SCAN_X_SAMPLES 4
-#define SCAN_Z_SAMPLES 4
+#define SCAN_X_SAMPLES 16
+#define SCAN_Z_SAMPLES 16
 
-#define SERVO_SPEED 60 //100?
+#define SERVO_SPEED 160 //100?
 
-#define SCAN_DELAY 30000 //milliseconds. Time between scans
+#define SCAN_DELAY 20000 //milliseconds. Time between scans
 
 //Status LED States
 #define STATUS_NORMAL 0

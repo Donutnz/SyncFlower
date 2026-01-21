@@ -187,6 +187,7 @@ void scanForSun(){
 					sunPosZ = zServo.getCurrentAngle(); // Save Z angle of top Lux
 				}
 
+				/*
 				Serial.print("SCANNING: ");
 				Serial.print("X: ");
 				Serial.print(xServo.getCurrentAngle());
@@ -194,6 +195,7 @@ void scanForSun(){
 				Serial.print(zServo.getCurrentAngle());
 				Serial.print(" Lux: ");
 				Serial.println(inputLuxVal);
+				*/
 
 				nextSample += zGrad; // Set next sample angle
 			}
@@ -205,29 +207,19 @@ void scanForSun(){
 			lumMaxX = lumMaxZ;
 			sunPosX = xServo.getCurrentAngle();
 		}
-
-		/*
-		for(int v = SCAN_Z_MIN; v <= SCAN_Z_MAX; v+=zGrad){ // Z Axis
-			inputLuxVal = veml.readLux(); // readALS() for raw intensity
-
-			if(inputLuxVal > lumMaxX){
-				lumMaxX = inputLuxVal;
-				sunPosX = v;
-			}
-		}
-
-		if(inputLuxVal > lumMaxZ){
-			lumMaxZ = inputLuxVal;
-			sunPosZ = u;
-		}
-		*/
 	}
 
 	setStatusLED(STATUS_ENDSCAN);
 
 	//Home servos
-	xServo.easeTo(sunPosX);
-	zServo.easeTo(sunPosZ);
+	xServo.setEaseTo(sunPosX);
+	zServo.setEaseTo(sunPosZ);
+
+	while(xServo.isMoving() || zServo.isMoving()){
+		hmqClient.loop();
+
+		updateAllServos();
+	}
 
 	luxReading = lumMaxX;
 }
@@ -336,7 +328,7 @@ void reconnect() {
 				"SF_Tracker",
 				hiveMQ_UName,
 				hiveMQ_Pass,
-				"tracker/discon",
+				"tracker/dconn",
 				2,
 				true,
 				"0"

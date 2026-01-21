@@ -4,6 +4,7 @@
  * !! NO CREDENTIALS !!
  */
 
+#define APP_DEBUG
 
 #define HEAD_SPEED 60 // Speed of head servos
 #define WINCH_SPEED 100 // Speed of winch servo
@@ -30,4 +31,4 @@
 #define PETALS_TRAVEL_DURATION 3000 //ms time for petals to go change
 
 // Colours
-#define COLOUR_SUN 255204000 //Might change to HSV hue
+#define COLOUR_SUN 9830 //Might change to HSV hue

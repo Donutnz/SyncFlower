@@ -33,20 +33,20 @@ bool petalsClosed = false;
 unsigned long battDispMillis = 0;
 
 // Time petals motor started
-unsigned long petalsMoveStart = 0;
+unsigned long petalsStartMillis = 0;
 
 //Make petals hit the limit switch
 void homePetals();
 
 void openPetals();
 
+void updateXZ();
+
 void updateHead();
 
-void updateNeo();
-
-void updatePetals();
-
 void setNeoToSun();
+
+void setNeoToSun(byte brightness);
 
 void readBattery();
 
@@ -56,6 +56,7 @@ void setup_wifi();
 // MQTT Connect
 void reconnect();
 
+// MQTT Callback function
 void callback(char* topic, byte* message, unsigned int length);
 
 void setup(){
@@ -72,13 +73,27 @@ void setup(){
 	pinMode(BATT_ADC_A, INPUT);
 	pinMode(BATT_ADC_B, INPUT);
 
-	zServo.attach(MOT_AX0, 90);
-	xServo.attach(MOT_AX1, 90);
+	zServo.attach(MOT_Z, 90);
+	xServo.attach(MOT_X, 90);
 
-	winchServo.attach(MOT_AX1, 0);
+	winchServo.attach(MOT_PETAL, 0);
+
+	zServo.setSpeed(HEAD_SPEED);
+	xServo.setSpeed(HEAD_SPEED);
+
+	winchServo.setSpeed(WINCH_SPEED);
 
 	setEasingTypeForAllServos(EASE_QUADRATIC_IN_OUT);
 
+	// Wait for servos to get to their start positions
+	synchronizeAllServosStartAndWaitForAllServosToStop();
+	
+	// Set servo operation to be non-blocking
+	synchronizeAllServosAndStartInterrupt(false);
+
+	//homePetals();
+	Serial.print("THing: ");
+	Serial.println(digitalRead(SW_LIMIT));
 	// Init Neopixel ring
 	neoStrip.begin();
 	neoStrip.show();
@@ -91,12 +106,6 @@ void setup(){
 	hmqClient.setClient(netClient);
 	hmqClient.setCallback(callback);
 
-	// Wait for servos to get to their start positions
-	synchronizeAllServosStartAndWaitForAllServosToStop();
-	
-	// Set servo operation to be non-blocking
-	synchronizeAllServosAndStartInterrupt(false);
-	
 	Serial.println("Set up done, running...");
 }
 
@@ -116,30 +125,33 @@ void loop(){
 
 	if((currentMillis - battDispMillis >= BATT_DISP_DURATION) && battDispMillis > 0){ // Reset display to normal
 		setNeoToSun();
+		battDispMillis = 0;
 	}
 
-	if(currentMillis - petalsMoveStart > PETALS_TRAVEL_DURATION){ // Stop petals when open
+	if(currentMillis - petalsStartMillis > PETALS_TRAVEL_DURATION){ // Stop petals when open
 		winchServo.easeTo(0); // Blocking. May cause issues?
 	}
 }
 
 void homePetals(){
-	winchServo.setEaseTo(WINCH_RETRACT_RATE);
+	Serial.println("Homing...");
+
+	if(digitalRead(SW_LIMIT)){ //If already touching limit switch
+		Serial.println("home stooped");
+		return;
+	}
+
+	//winchServo.easeTo(WINCH_RETRACT_RATE);
 
 	unsigned long startMillis = millis();
 
 	while(!digitalRead(SW_LIMIT)){
-		
-		if(winchServo.isMoving()){ //This way in case limit is hit during ease in
-			winchServo.update();
-		}
-
-		if((millis() - startMillis) > 5000){ // watchdog incase of limit switch not working 
-			break;
-		}
+		//hmqClient.loop();
 	}
 
-	winchServo.write(0); //Stop winch
+	winchServo.easeTo(0); // Stop pulling
+
+	Serial.println("Petals Homed");
 }
 
 void readBattery(){
@@ -164,13 +176,26 @@ void readBattery(){
 }
 
 void setNeoToSun(){
-	neoStrip.fill(neoStrip.gamma32(COLOUR_SUN), 0, NEO_COUNT);
+	neoStrip.fill(neoStrip.gamma32(neoStrip.ColorHSV(COLOUR_SUN)), 0, NEO_COUNT);
 	neoStrip.show();
 }
 
-void updateHead(){
-	xServo.setEaseTo(headX);
+void setNeoToSun(byte brightness){
+	neoStrip.fill(neoStrip.gamma32(neoStrip.ColorHSV(COLOUR_SUN, 255, brightness)), 0, NEO_COUNT);
+	neoStrip.show();
+}
+
+void updateXZ(){
 	zServo.setEaseTo(headZ);
+	xServo.setEaseTo(headZ);
+	
+	while(isOneServoMoving){
+		hmqClient.loop(); // Maintain MQTT connection
+		
+		updateAllServos();
+	}
+	
+	xServo.setEaseTo(headX);
 
 	while(isOneServoMoving){
 		hmqClient.loop(); // Maintain MQTT connection
@@ -179,13 +204,40 @@ void updateHead(){
 	}
 }
 
-void updatePetals(){
+void updateHead(){
+	float brightLvl;
+
+	bool opening;
+
 	if(headLux >= PETAL_THRESHOLD){
-		winchServo.setEaseTo(WINCH_DEPLOY_RATE);
+		brightLvl = 0.0f;
+		opening = true;
+		winchServo.easeTo(WINCH_DEPLOY_RATE);
 	}
-	else if(headLux < PETAL_THRESHOLD && ){
-		winchServo.setEaseTo(WINCH_RETRACT_RATE);
+	else if(headLux < PETAL_THRESHOLD){
+		brightLvl = 255.0f;
+		opening = false;
+		winchServo.easeTo(WINCH_RETRACT_RATE);
 	}
+
+	unsigned long startMillis = millis();
+
+	float step = 255.0f / PETALS_TRAVEL_DURATION;
+
+	while(millis() - startMillis < PETALS_TRAVEL_DURATION){
+		hmqClient.loop();
+
+		if(opening){
+			brightLvl += step;
+		}
+		else{
+			brightLvl -= step;
+		}
+
+		setNeoToSun(constrain((int)brightLvl, 0, 255));
+	}
+
+	winchServo.easeTo(0); //Stop moving
 }
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -210,7 +262,10 @@ void callback(char* topic, byte* message, unsigned int length) {
 		headLux = atoi((char*)message);
 	}
 	else if(String(topic) == "tracker/EOF"){
-		
+		updateXZ();
+
+		updateHead();
+
 		hmqClient.publish("flower/ACK", "1");
 	}
 }
