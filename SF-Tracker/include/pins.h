@@ -16,5 +16,5 @@
 #define ONBOARD_LED 8
 
 #define STATUS_B 1
-#define STATUS_G 3
-#define STATUS_R 4
+#define STATUS_G 4
+#define STATUS_R 3
