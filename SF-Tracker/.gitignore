@@ -4,5 +4,4 @@
 .vscode/launch.json
 .vscode/ipch
 
-SF-Tracker/include/creds.h
 include/creds.h
