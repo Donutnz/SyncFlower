@@ -13,6 +13,10 @@ Copy creds.h file template from root into both SF-Tracker/include/ and SF-Flower
 ### Flashing 
 Use PlatformIO (e.g. VSC Extension) for uploading on both devices. It is the easiest option.
 
+### Configuration
+- Flower: /SF-Flower/include/config.h
+- Tracker: /SF-Tracker/include/config.h
+
 
 ## Requirements
 PlatformIO
