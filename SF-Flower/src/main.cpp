@@ -84,7 +84,7 @@ void setup(){
 	zServo.attach(MOT_Z, 90);
 	xServo.attach(MOT_X, 90);
 
-	winchServo.attach(MOT_PETAL, 0);
+	winchServo.attach(MOT_PETAL, 90);
 
 	zServo.setSpeed(HEAD_SPEED);
 	xServo.setSpeed(HEAD_SPEED);
