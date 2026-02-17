@@ -38,7 +38,7 @@ unsigned long petalsStartMillis = 0;
 // Steps of brightness for neo ring
 float brightnessStep = 255.0f / PETALS_TRAVEL_DURATION;
 
-//Make petals hit the limit switch
+//Make petals hit the limit switch. Run first.
 void homePetals();
 
 void setPetals(bool isOpening);
@@ -46,8 +46,6 @@ void setPetals(bool isOpening);
 void updatePetals();
 
 void setXZ();
-
-void updateHead();
 
 void updateRing();
 
@@ -128,22 +126,14 @@ void loop(){
 	}
 	hmqClient.loop();
 
-	unsigned long currentMillis = millis();
-
-	if(digitalRead(SW_UI) && (currentMillis - battDispMillis > 10)){ // Debounce as well
-		battDispMillis = currentMillis;
-
+	if(digitalRead(SW_UI) && (millis() - battDispMillis > 10)){ // Debounce as well
 		readBattery();
 	}
 
-	if((currentMillis - battDispMillis >= BATT_DISP_DURATION) && battDispMillis > 0){ // Reset display to normal
-		setNeoToSun();
-		battDispMillis = 0;
-	}
+	updatePetals();
+	updateRing();
 
-	if(currentMillis - petalsStartMillis > PETALS_TRAVEL_DURATION){ // Stop petals when open
-		winchServo.easeTo(90); // Blocking. May cause issues?
-	}
+	updateAllServos();
 }
 
 void homePetals(){
@@ -151,18 +141,19 @@ void homePetals(){
 
 	if(digitalRead(SW_LIMIT)){ //If already touching limit switch
 		Serial.println("Homing stopped");
+		petalsStatus = PETALS_CLOSED;
 		return;
 	}
 
 	winchServo.easeTo(WINCH_RETRACT);
 
-	unsigned long startMillis = millis();
+	unsigned long startMillis = millis(); 
 
 	while(!digitalRead(SW_LIMIT)){ // Retract until limit sw hit
-		
+		; // Stop if running too long
 	}
 
-	winchServo.easeTo(WINCH_STOP); // Stop pulling
+	winchServo.write(WINCH_STOP); // Stop pulling
 
 	petalsStatus = PETALS_CLOSED; 
 
@@ -205,7 +196,16 @@ void updateRing(){
 		setNeoToSun(constrain((int)neoStrip.getBrightness() - brightnessStep, 0, 255));
 	}
 	
-	neoStrip.show();
+	if(petalsStatus == PETALS_OPENING || petalsStatus == PETALS_CLOSING){ // Don't run show() if not needed
+		neoStrip.show();
+	}
+
+	if(battDispMillis > 0){
+		if((millis() - battDispMillis >= BATT_DISP_DURATION)){
+			setNeoToSun();
+			battDispMillis = 0;
+		}
+	}
 }
 
 void readBattery(){
@@ -226,12 +226,13 @@ void readBattery(){
 		neoStrip.setPixelColor(i, neoStrip.gamma32(neoStrip.ColorHSV(map(i, 0, 15, 0, 65536/3)))); // Map 0-15 to HSV red-green range
 	}
 
+	battDispMillis = millis();
+
 	neoStrip.show();
 }
 
 void setNeoToSun(){
-	neoStrip.fill(neoStrip.gamma32(neoStrip.ColorHSV(COLOUR_SUN)), 0, NEO_COUNT);
-	neoStrip.show();
+	setNeoToSun(255);
 }
 
 void setNeoToSun(byte brightness){
@@ -248,42 +249,6 @@ void setXZ(){ // TODO combine into single movement. ZXMove + (Xmove - ZXmove)?
 		
 		updateAllServos();
 	}
-}
-
-void updateHead(){
-	float brightLvl;
-
-	bool opening;
-
-	if(headFinalLux >= PETAL_THRESHOLD){
-		brightLvl = 0.0f;
-		opening = true;
-		winchServo.easeTo(90 + WINCH_DEPLOY_RATE);
-	}
-	else{
-		brightLvl = 255.0f;
-		opening = false;
-		winchServo.easeTo(90 + WINCH_RETRACT_RATE);
-	}
-
-	unsigned long startMillis = millis();
-
-	float step = 255.0f / PETALS_TRAVEL_DURATION;
-
-	while(millis() - startMillis < PETALS_TRAVEL_DURATION){
-		hmqClient.loop();
-
-		if(opening){
-			brightLvl += step;
-		}
-		else{
-			brightLvl -= step;
-		}
-
-		setNeoToSun(constrain((int)brightLvl, 0, 255));
-	}
-
-	winchServo.easeTo(90); //Stop moving
 }
 
 void setStatusRing(int statusColour){
