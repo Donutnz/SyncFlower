@@ -23,11 +23,11 @@ char msgBuffer[12];
 
 Adafruit_NeoPixel neoStrip(NEO_COUNT, NEO_PIN); // May need other arg
 
-int headX = 90;
-int headZ = 90;
-int headLux = 0;
+int headFinalX = 90;
+int headFinalZ = 90;
+int headFinalLux = 0;
 
-bool petalsClosed = false;
+PETALS_STATE petalsStatus = PETALS_OPEN;
 
 // Time batt disp started
 unsigned long battDispMillis = 0;
@@ -35,14 +35,21 @@ unsigned long battDispMillis = 0;
 // Time petals motor started
 unsigned long petalsStartMillis = 0;
 
+// Steps of brightness for neo ring
+float brightnessStep = 255.0f / PETALS_TRAVEL_DURATION;
+
 //Make petals hit the limit switch
 void homePetals();
 
-void openPetals();
+void setPetals(bool isOpening);
 
-void updateXZ();
+void updatePetals();
+
+void setXZ();
 
 void updateHead();
+
+void updateRing();
 
 void setNeoToSun();
 
@@ -100,7 +107,7 @@ void setup(){
 	synchronizeAllServosAndStartInterrupt(false);
 
 	//homePetals();
-	Serial.print("Thing: ");
+	Serial.print("Endstop Read: ");
 	Serial.println(digitalRead(SW_LIMIT));
 	homePetals();
 
@@ -143,21 +150,62 @@ void homePetals(){
 	Serial.println("Homing...");
 
 	if(digitalRead(SW_LIMIT)){ //If already touching limit switch
-		Serial.println("home stooped");
+		Serial.println("Homing stopped");
 		return;
 	}
 
-	winchServo.easeTo(90 + WINCH_RETRACT_RATE);
+	winchServo.easeTo(WINCH_RETRACT);
 
 	unsigned long startMillis = millis();
 
-	while(!digitalRead(SW_LIMIT)){
-		//hmqClient.loop();
+	while(!digitalRead(SW_LIMIT)){ // Retract until limit sw hit
+		
 	}
 
-	winchServo.easeTo(90); // Stop pulling
+	winchServo.easeTo(WINCH_STOP); // Stop pulling
+
+	petalsStatus = PETALS_CLOSED; 
 
 	Serial.println("Petals Homed");
+}
+
+void setPetals(bool isOpening){
+	if(isOpening){
+		winchServo.easeTo(WINCH_DEPLOY);
+		petalsStatus = PETALS_OPENING;
+	}
+	else{
+		winchServo.easeTo(WINCH_RETRACT);
+		petalsStatus = PETALS_CLOSING;
+	}
+
+	petalsStartMillis = millis();
+}
+
+void updatePetals(){
+	if(winchServo.getCurrentAngle() != WINCH_STOP){
+		if(millis() - petalsStartMillis >= PETALS_TRAVEL_DURATION){
+			winchServo.easeTo(WINCH_STOP);
+
+			if(petalsStatus == PETALS_OPENING){
+				petalsStatus = PETALS_OPEN;
+			}
+			else if(petalsStatus == PETALS_CLOSING){
+				petalsStatus = PETALS_CLOSED;
+			}
+		}
+	}
+}
+
+void updateRing(){
+	if(petalsStatus == PETALS_CLOSING){
+		setNeoToSun(constrain((int)neoStrip.getBrightness() + brightnessStep, 0, 255));
+	}
+	else if(petalsStatus == PETALS_OPENING){
+		setNeoToSun(constrain((int)neoStrip.getBrightness() - brightnessStep, 0, 255));
+	}
+	
+	neoStrip.show();
 }
 
 void readBattery(){
@@ -191,21 +239,13 @@ void setNeoToSun(byte brightness){
 	neoStrip.show();
 }
 
-void updateXZ(){
-	zServo.setEaseTo(headZ);
-	xServo.setEaseTo(headZ);
+void setXZ(){ // TODO combine into single movement. ZXMove + (Xmove - ZXmove)?
+	zServo.setEaseTo(headFinalZ);
+	xServo.setEaseTo(headFinalZ + (headFinalX-headFinalZ)); //Hmm. Note sure about this.
 	
 	while(isOneServoMoving){
 		hmqClient.loop(); // Maintain MQTT connection
 		
-		updateAllServos();
-	}
-	
-	xServo.setEaseTo(headX);
-
-	while(isOneServoMoving){
-		hmqClient.loop(); // Maintain MQTT connection
-
 		updateAllServos();
 	}
 }
@@ -215,12 +255,12 @@ void updateHead(){
 
 	bool opening;
 
-	if(headLux >= PETAL_THRESHOLD){
+	if(headFinalLux >= PETAL_THRESHOLD){
 		brightLvl = 0.0f;
 		opening = true;
 		winchServo.easeTo(90 + WINCH_DEPLOY_RATE);
 	}
-	else if(headLux < PETAL_THRESHOLD){
+	else{
 		brightLvl = 255.0f;
 		opening = false;
 		winchServo.easeTo(90 + WINCH_RETRACT_RATE);
@@ -260,30 +300,49 @@ void callback(char* topic, byte* message, unsigned int length) {
 	Serial.print(". Message: ");
 	String messageTemp;
 
-	for (int i = 0; i < length; i++) {
-		Serial.print((char)message[i]);
-		messageTemp += (char)message[i];
-	}
-	Serial.println();
+	String xStr = "";
+	String zStr = "";
+	String luxStr = "";
 
-	if(String(topic) == "tracker/X"){
-		headX = atoi((char*)message);
-	}
-	else if(String(topic) == "tracker/Z"){
-		headZ = atoi((char*)message);
-	}
-	else if(String(topic) == "tracker/lux"){
-		headLux = atoi((char*)message);
-	}
-	else if(String(topic) == "tracker/EOF"){
-		updateXZ();
+	String *targStr;
+
+	if(String(topic) == "tracker/data"){
+
+		for (int i = 0; i < length; i++) {
+			Serial.print((char)message[i]);
+			messageTemp += (char)message[i];
+
+			if((char)message[i] == 'X'){
+				targStr = &xStr;
+			}
+			else if((char)message[i] == 'Z'){
+				targStr = &zStr;
+			}
+			else if((char)message[i] == 'L'){
+				targStr = &luxStr;
+			}
+			else if((int)message[i] >= 48 && (int)message[i] <= 57){ // Add char to pertinant str
+				*targStr += (char)message[i];
+			}
+			else{
+				Serial.print("MQTT Msg Unknown Char: ");
+				Serial.print((char)message[i]);
+			}
+		}
+		Serial.println();
+
+		headFinalX = xStr.toInt();
+		headFinalZ = zStr.toInt();
+		headFinalLux = luxStr.toInt();
+
+		setXZ();
 
 		updateHead();
 
 		hmqClient.publish("flower/ACK", "1");
 	}
 	else if(String(topic) == "tracker/dconn"){
-		setStatusRing(0);
+		setStatusRing(COLOUR_DCONN);
 	}
 }
 
