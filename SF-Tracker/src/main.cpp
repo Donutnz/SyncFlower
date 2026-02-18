@@ -150,6 +150,9 @@ void updateFlower(){
 	sprintf(msgBuffer, "%d", luxReading); //20-5000 lux range
 	hmqClient.publish("tracker/lux", msgBuffer);
 
+	sprintf(msgBuffer, "X%dZ%dL%d", sunPosX, sunPosZ, luxReading);
+	hmqClient.publish("tracker/data", msgBuffer);
+
 	hmqClient.publish("tracker/EOT", "1"); // End of data
 
 	Serial.println("Published update");

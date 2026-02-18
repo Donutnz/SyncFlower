@@ -13,8 +13,8 @@
 #define SW_LIMIT 3 // Winch pull limit switch
 #define SW_UI 4
  
-#define MOT_X 5
-#define MOT_Z 6
+#define MOT_U 5 //prev x
+#define MOT_V 6 //prev z
 
 #define MOT_PETAL 7
 

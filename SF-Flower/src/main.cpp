@@ -8,8 +8,8 @@
 #include "config.h"
 #include "creds.h"
 
-ServoEasing xServo;
-ServoEasing zServo;
+ServoEasing uServo; //x
+ServoEasing vServo; //z
 ServoEasing winchServo;
 
 // Current position of petals and thus winch
@@ -22,10 +22,6 @@ PubSubClient hmqClient(netClient);
 char msgBuffer[12];
 
 Adafruit_NeoPixel neoStrip(NEO_COUNT, NEO_PIN); // May need other arg
-
-int headFinalX = 90;
-int headFinalZ = 90;
-int headFinalLux = 0;
 
 PETALS_STATE petalsStatus = PETALS_OPEN;
 
@@ -86,13 +82,13 @@ void setup(){
 	pinMode(BATT_ADC_A, INPUT);
 	pinMode(BATT_ADC_B, INPUT);
 
-	zServo.attach(MOT_Z, 90);
-	xServo.attach(MOT_X, 90);
+	vServo.attach(MOT_V, WINCH_STOP);
+	uServo.attach(MOT_U, WINCH_STOP);
 
 	winchServo.attach(MOT_PETAL, 90);
 
-	zServo.setSpeed(HEAD_SPEED);
-	xServo.setSpeed(HEAD_SPEED);
+	vServo.setSpeed(HEAD_SPEED);
+	uServo.setSpeed(HEAD_SPEED);
 
 	winchServo.setSpeed(WINCH_SPEED);
 
@@ -240,15 +236,9 @@ void setNeoToSun(byte brightness){
 	neoStrip.show();
 }
 
-void setXZ(){ // TODO combine into single movement. ZXMove + (Xmove - ZXmove)?
-	zServo.setEaseTo(headFinalZ);
-	xServo.setEaseTo(headFinalZ + (headFinalX-headFinalZ)); //Hmm. Note sure about this.
-	
-	while(isOneServoMoving){
-		hmqClient.loop(); // Maintain MQTT connection
-		
-		updateAllServos();
-	}
+void setXZ(int xAng, int zAng){ // TODO combine into single movement. U + (U - V)?
+	vServo.setEaseTo(xAng);
+	uServo.setEaseTo(zAng + (zAng - xAng)); //Hmm. Not sure about this.
 }
 
 void setStatusRing(int statusColour){
@@ -296,13 +286,11 @@ void callback(char* topic, byte* message, unsigned int length) {
 		}
 		Serial.println();
 
-		headFinalX = xStr.toInt();
-		headFinalZ = zStr.toInt();
-		headFinalLux = luxStr.toInt();
+		int headFinalX = xStr.toInt();
+		int headFinalZ = zStr.toInt();
+		int headFinalLux = luxStr.toInt();
 
-		setXZ();
-
-		updateHead();
+		setXZ(headFinalX, headFinalZ);
 
 		hmqClient.publish("flower/ACK", "1");
 	}
